@@ -1,84 +1,84 @@
-function modifyNodeNames(nodes, airportCode = 'UN') {
-    // 国家/地区中文到英文缩写的映射
-    const countryMap = {
-        '香港': 'HK',
-        '台湾': 'TW',
-        '新加坡': 'SG',
-        '日本': 'JP',
-        '美国': 'US',
-        '韩国': 'KR',
-        '英国': 'UK',
-        '德国': 'DE',
-        '法国': 'FR',
-        '加拿大': 'CA',
-        '澳大利亚': 'AU',
-        // 可根据需要扩展更多映射
-    };
+// Sub-Store 节点重命名脚本
+// 使用方式：将此文件上传到 GitHub，然后在 Sub-Store 里作为远程脚本引用
 
-    // 要过滤的关键词列表
-    const filterKeywords = [
-        '域名', '套餐', '到期', '访问', '失联', 
-        '剩余', '流量', '距离', '下次', '重置'
-    ];
+// 国家映射表
+const countryMap = {
+  "香港": "HK",
+  "台湾": "TW",
+  "日本": "JP",
+  "韩国": "KR",
+  "新加坡": "SG",
+  "美国": "US",
+  "英国": "UK",
+  "德国": "DE",
+  "法国": "FR",
+  "加拿大": "CA",
+  "澳大利亚": "AU",
+  "俄罗斯": "RU",
+  "印度": "IN",
+  "泰国": "TH",
+  "越南": "VN",
+  "菲律宾": "PH",
+  "马来西亚": "MY",
+  "印尼": "ID"
+};
 
-    // 先按国家分组节点
-    const groupedNodes = nodes.reduce((groups, node) => {
-        let name = node.name;
-        
-        // 过滤掉不需要的关键词
-        filterKeywords.forEach(keyword => {
-            name = name.replace(new RegExp(keyword, 'gi'), '');
-        });
-        // 清理多余的空格和分隔符
-        name = name.trim().replace(/\s+/g, ' ').replace(/[|_]+/g, ' ');
+// 分类关键词
+const categories = [
+  { key: "IPLC", regex: /(IPLC|I\s*PLC)/i },
+  { key: "AI", regex: /(chatgpt|ai)/i },
+  { key: "Media", regex: /(流媒体|奈飞|Netflix|迪士尼|Disney|HBO|Prime|HULU)/i }
+];
 
-        // 提取国家
-        let country = Object.keys(countryMap).find(cn => name.includes(cn)) || 'Unknown';
-        let countryCode = countryMap[country] || 'UN';
-
-        if (!groups[countryCode]) {
-            groups[countryCode] = [];
-        }
-        groups[countryCode].push({ ...node, name, countryCode });
-        return groups;
-    }, {});
-
-    // 处理每个国家的节点，单独计数序号
-    let modifiedNodes = [];
-    Object.keys(groupedNodes).forEach(countryCode => {
-        let counter = 1;
-        groupedNodes[countryCode].forEach(node => {
-            let name = node.name;
-            
-            // 初始化标签
-            let tag = '';
-            
-            // 检查是否包含特定关键词并添加相应标签
-            if (name.toLowerCase().includes('iplc')) {
-                tag = '|IPLC';
-            } else if (name.includes('netflix') || name.includes('流媒体')) {
-                tag = '|Media';
-            } else if (name.toLowerCase().includes('ai') || name.toLowerCase().includes('chatgpt')) {
-                tag = '|AI';
-            }
-
-            // 格式化新名称：机场名|国家缩写|标签|序号（序号三位补零）
-            let newName = `${airportCode}|${countryCode}${tag}|${counter.toString().padStart(3, '0')}`;
-            counter++;
-
-            modifiedNodes.push({
-                ...node,
-                name: newName
-            });
-        });
-    });
-
-    return modifiedNodes;
+// 去掉 emoji
+function removeEmoji(str) {
+  return str.replace(
+    /[\u{1F300}-\u{1FAFF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,
+    ""
+  );
 }
 
-// SubStore 需要的函数签名
-function operator(proxies, env) {
-    // 从 env 获取机场代码，默认为 'UN'
-    const airportCode = env?.params?.airportCode || 'UN';
-    return modifyNodeNames(proxies, airportCode);
+// 入口函数
+module.exports.parse = (raw, { yaml, notify }) => {
+  let nodes = yaml.parse(raw).proxies || [];
+
+  // 过滤掉无效节点
+  nodes = nodes.filter(n => n && n.name);
+
+  // 处理节点
+  let result = [];
+  let counter = {};
+
+  nodes.forEach(node => {
+    let name = removeEmoji(node.name);
+
+    // 识别国家
+    let country = "ZZ"; // 默认
+    for (let cn in countryMap) {
+      if (name.includes(cn)) {
+        country = countryMap[cn];
+        break;
+      }
+    }
+
+    // 分类标签
+    let tag = "General";
+    for (let cat of categories) {
+      if (cat.regex.test(name)) {
+        tag = cat.key;
+        break;
+      }
+    }
+
+    // 计数器
+    const key = ${country}|${tag};
+    if (!counter[key]) counter[key] = 1;
+    else counter[key]++;
+
+    // 新名字
+    node.name = ${country} | ${tag} | ${String(counter[key]).padStart(2, "0")};
+    result.push(node);
+  });
+
+  return yaml.stringify({ proxies: result });
 }
