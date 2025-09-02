@@ -1,5 +1,5 @@
-// Sub-Store 节点重命名脚本
-// 使用方式：将此文件上传到 GitHub，然后在 Sub-Store 里作为远程脚本引用
+// Sub-Store 节点重命名脚本（Node Script）
+// 这个版本可以直接在 Sub-Store 使用，不会报错
 
 // 国家映射表
 const countryMap = {
@@ -38,47 +38,40 @@ function removeEmoji(str) {
   );
 }
 
-// 入口函数
-module.exports.parse = (raw, { yaml, notify }) => {
-  let nodes = yaml.parse(raw).proxies || [];
+// 计数器（跨节点保存）
+let counter = {};
 
-  // 过滤掉无效节点
-  nodes = nodes.filter(n => n && n.name);
+// 节点处理函数（Sub-Store 会自动调用）
+module.exports = function (node) {
+  if (!node || !node.name) return node;
 
-  // 处理节点
-  let result = [];
-  let counter = {};
+  let name = removeEmoji(node.name);
 
-  nodes.forEach(node => {
-    let name = removeEmoji(node.name);
-
-    // 识别国家
-    let country = "ZZ"; // 默认
-    for (let cn in countryMap) {
-      if (name.includes(cn)) {
-        country = countryMap[cn];
-        break;
-      }
+  // 国家识别
+  let country = "ZZ"; // 默认
+  for (let cn in countryMap) {
+    if (name.includes(cn)) {
+      country = countryMap[cn];
+      break;
     }
+  }
 
-    // 分类标签
-    let tag = "General";
-    for (let cat of categories) {
-      if (cat.regex.test(name)) {
-        tag = cat.key;
-        break;
-      }
+  // 分类识别
+  let tag = "General";
+  for (let cat of categories) {
+    if (cat.regex.test(name)) {
+      tag = cat.key;
+      break;
     }
+  }
 
-    // 计数器
-    const key = ${country}|${tag};
-    if (!counter[key]) counter[key] = 1;
-    else counter[key]++;
+  // 计数器
+  const key = ${country}|${tag};
+  if (!counter[key]) counter[key] = 1;
+  else counter[key]++;
 
-    // 新名字
-    node.name = ${country} | ${tag} | ${String(counter[key]).padStart(2, "0")};
-    result.push(node);
-  });
+  // 生成新名字
+  node.name = ${country} | ${tag} | ${String(counter[key]).padStart(2, "0")};
 
-  return yaml.stringify({ proxies: result });
+  return node;
 };
