@@ -1,5 +1,5 @@
-// Sub-Store 节点重命名脚本（Node Script）
-// 这个版本可以直接在 Sub-Store 使用，不会报错
+// Sub-Store 节点重命名脚本
+// 规则：去 emoji → 国家映射 → 分类标签 → 统一命名
 
 // 国家映射表
 const countryMap = {
@@ -38,17 +38,19 @@ function removeEmoji(str) {
   );
 }
 
-// 计数器（跨节点保存）
-let counter = {};
+// 计数器
+if (typeof globalThis.renameCounter === "undefined") {
+  globalThis.renameCounter = {};
+}
 
-// 节点处理函数（Sub-Store 会自动调用）
-module.exports = function (node) {
+// Sub-Store 会调用这个函数
+function rename(node) {
   if (!node || !node.name) return node;
 
   let name = removeEmoji(node.name);
 
   // 国家识别
-  let country = "ZZ"; // 默认
+  let country = "ZZ";
   for (let cn in countryMap) {
     if (name.includes(cn)) {
       country = countryMap[cn];
@@ -67,11 +69,11 @@ module.exports = function (node) {
 
   // 计数器
   const key = ${country}|${tag};
-  if (!counter[key]) counter[key] = 1;
-  else counter[key]++;
+  if (!globalThis.renameCounter[key]) globalThis.renameCounter[key] = 1;
+  else globalThis.renameCounter[key]++;
 
-  // 生成新名字
-  node.name = ${country} | ${tag} | ${String(counter[key]).padStart(2, "0")};
+  // 新名字
+  node.name = ${country} | ${tag} | ${String(globalThis.renameCounter[key]).padStart(2, "0")};
 
   return node;
-};
+}
