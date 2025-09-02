@@ -81,4 +81,4 @@ module.exports.parse = (raw, { yaml, notify }) => {
   });
 
   return yaml.stringify({ proxies: result });
-}
+};
